@@ -40,21 +40,28 @@ export default async function handler(req, res) {
             aiResponse = data.choices?.[0]?.message?.content?.trim();
 
         } else if (provider === 'grok') {
-            const apiKey = process.env.XAI_API_KEY;
-            if (!apiKey) throw new Error('XAI_API_KEY não configurada no ambiente');
+    const apiKey = process.env.XAI_API_KEY;
+    if (!apiKey) throw new Error('XAI_API_KEY não configurada no ambiente');
 
-            const response = await fetch('https://api.x.ai/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                    model: model || 'grok-2-latest',
-                    messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.3
-                })
-            });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
-            aiResponse = data.choices?.[0]?.message?.content?.trim();
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model || 'grok-beta',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      const errMsg = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
+      throw new Error(`Erro da xAI: ${errMsg}`);
+    }
+    aiResponse = data.choices?.[0]?.message?.content?.trim();
 
         } else if (provider === 'claude') {
             const apiKey = process.env.CLAUDE_API_KEY;
