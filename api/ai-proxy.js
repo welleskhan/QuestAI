@@ -1,26 +1,31 @@
 export default async function handler(req, res) {
-    // Permite CORS para o seu frontend
+    // Configuração de CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,GET');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
     }
 
-    const { provider, model, prompt } = req.body;
+    const { provider, model, prompt } = req.body || {};
+
+    if (!prompt) {
+        return res.status(400).json({ error: 'O campo prompt é obrigatório' });
+    }
 
     try {
         let aiResponse = '';
 
         if (provider === 'openai') {
             const apiKey = process.env.OPENAI_API_KEY;
+            if (!apiKey) throw new Error('OPENAI_API_KEY não configurada no ambiente');
+
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -32,10 +37,12 @@ export default async function handler(req, res) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
-            aiResponse = data.choices[0].message.content.trim();
+            aiResponse = data.choices?.[0]?.message?.content?.trim();
 
         } else if (provider === 'grok') {
             const apiKey = process.env.XAI_API_KEY;
+            if (!apiKey) throw new Error('XAI_API_KEY não configurada no ambiente');
+
             const response = await fetch('https://api.x.ai/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -47,10 +54,12 @@ export default async function handler(req, res) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
-            aiResponse = data.choices[0].message.content.trim();
+            aiResponse = data.choices?.[0]?.message?.content?.trim();
 
         } else if (provider === 'claude') {
             const apiKey = process.env.CLAUDE_API_KEY;
+            if (!apiKey) throw new Error('CLAUDE_API_KEY não configurada no ambiente');
+
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: {
@@ -65,11 +74,13 @@ export default async function handler(req, res) {
                 })
             });
             const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
-            aiResponse = data.content[0].text.trim();
+            if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+            aiResponse = data.content?.[0]?.text?.trim();
 
         } else if (provider === 'gemini') {
             const apiKey = process.env.GEMINI_API_KEY;
+            if (!apiKey) throw new Error('GEMINI_API_KEY não configurada no ambiente');
+
             const selectedModel = model || 'gemini-2.5-flash';
             const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`,
@@ -85,7 +96,7 @@ export default async function handler(req, res) {
             );
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
-            aiResponse = data.candidates[0].content.parts[0].text.trim();
+            aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
         } else {
             return res.status(400).json({ error: 'Provedor de IA inválido' });
